@@ -56,7 +56,7 @@ std::vector<double> simpleIterationMethod(const std::vector<std::vector<double>>
 
 int main()
 {
-    int n = 13600;
+    int n = 13700;
     int nm = 40;
     std::vector<std::vector<double>> A(n, std::vector<double>(n, 1.0));
 
@@ -81,7 +81,7 @@ int main()
     std::cout << "Решение системы:" << std::endl;
     for (int i = 0; i < solution.size(); ++i)
     {
-        std::cout << "x[" << i << "] = " << solution[i] << std::endl;
+        if(i<10)std::cout << "x[" << i << "] = " << solution[i] << std::endl;
     }
     std::cout << t1;
     return 0;

@@ -11,11 +11,10 @@
 double loss_prev = INT_MAX;
 
 std::vector<double> simpleIterationMethod(const std::vector<std::vector<double>> &A, const std::vector<double> &b,
-                                          double eps, int nm, int n, int b_znam)
+                                          double eps, int nm, int n, double b_znam)
 {
-    std::vector<double> x(b.size(), 0.0);
+    std::vector<double> x(n, 0.0);
     double bhg = 0;
-    // int N = b.size();
     double tet = 0.0001;
     double err = 1;
     while (err > eps)
@@ -38,9 +37,6 @@ std::vector<double> simpleIterationMethod(const std::vector<std::vector<double>>
             chisl += err_chisl[i];
         }
 
-// #pragma omp atomic
-//         chisl += err_chisl[i];
-
         err = sqrt(chisl) / sqrt(b_znam);
         if ((loss_prev - err) < 0.0001)
         {
@@ -54,8 +50,8 @@ std::vector<double> simpleIterationMethod(const std::vector<std::vector<double>>
 
 int main()
 {
-    int n = 10;
-    int nm = 1;
+    int n = 13700;
+    int nm = 40;
     std::vector<std::vector<double>> A(n, std::vector<double>(n, 1.0));
 #pragma omp parallel for num_threads(nm)
     for (int i = 0; i < n; i++)
@@ -77,7 +73,7 @@ int main()
     std::cout << "Решение системы:" << std::endl;
     for (int i = 0; i < solution.size(); ++i)
     {
-        std::cout << "x[" << i << "] = " << solution[i] << std::endl;
+        if(i <10)std::cout << "x[" << i << "] = " << solution[i] << std::endl;
     }
     std::cout << t1;
     return 0;
