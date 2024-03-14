@@ -10,7 +10,7 @@
 
 double loss_prev = INT_MAX;
 
-std::vector<double> simpleIterationMethod(const std::vector<std::vector<double>> &A, const std::vector<double> &b,
+std::vector<double> simpleIterationMethod(const std::vector<double> &A, const std::vector<double> &b,
                                           double eps, int nm, int n, double b_znam)
 {
     std::vector<double> x(n, 0.0);
@@ -26,14 +26,15 @@ std::vector<double> simpleIterationMethod(const std::vector<std::vector<double>>
 #pragma omp parallel for schedule(dynamic, n/nm) num_threads(nm)
         for (int i = 0; i < n; i++)
         {
-            x_new[i] = 0;
+            double sum = 0;
             for (int j = 0; j < n; j++)
             {
-                x_new[i] += A[i][j] * x[j];
+                sum += A[i * n + j] * x[j];
             }
-            x_new[i] -= b[i];
+            x_new[i] = sum - b[i];
             err_chisl[i] = pow(x_new[i], 2);
             x_new[i] = x[i] - tet * x_new[i];
+#pragma omp atomic
             chisl += err_chisl[i];
         }
 
@@ -52,18 +53,15 @@ int main()
 {
     int n = 13700;
     int nm = 20;
-    std::vector<std::vector<double>> A(n, std::vector<double>(n, 1.0));
+
+    // Создание и заполнение одномерного массива для матрицы A
+    std::vector<double> A(n * n, 1.0);
 #pragma omp parallel for num_threads(nm)
     for (int i = 0; i < n; i++)
     {
-        for (int j = 0; j < n; j++)
-        {
-            if (i == j)
-            {
-                A[i][j] = 2.0;
-            }
-        }
+        A[i * n + i] = 2.0;
     }
+
     std::vector<double> b(n, 1 + n);
     double b_znam = pow(n + 1, 2) * n;
     double tolerance = 0.00001;
@@ -73,7 +71,8 @@ int main()
     std::cout << "Решение системы:" << std::endl;
     for (int i = 0; i < solution.size(); ++i)
     {
-        if(i <10)std::cout << "x[" << i << "] = " << solution[i] << std::endl;
+        if (i < 10)
+            std::cout << "x[" << i << "] = " << solution[i] << std::endl;
     }
     std::cout << t1;
     return 0;
