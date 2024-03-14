@@ -9,8 +9,6 @@
 #include <string>
 #include <cstring> 
 
-
-
 struct Task {
     std::string type;
     double argument;
@@ -58,7 +56,7 @@ private:
                 if(task.second.type == "Sinus"){
                     result = std::sin(task.second.argument);
                 }
-                else if(task.second.type == "SquareRoot"){
+                else if(task.second.type == "Square"){
                     result = std::sqrt(task.second.argument);
                 }
                 else{
@@ -82,7 +80,7 @@ private:
 void client(Server<double>& server, Task task, const std::string& filename) {
     std::ofstream file(filename);
     if (!file.is_open()) {
-        std::cerr << "Failed to open file " << filename << std::endl;
+        std::cerr << "Не удалось открыть файл" << filename << std::endl;
         return;
     }
 
@@ -92,21 +90,21 @@ void client(Server<double>& server, Task task, const std::string& filename) {
     std::uniform_int_distribution<int> dist2(0, 10);
 
     for (size_t i = 0; i < task.iter; ++i) {
-        double argument = dist(gen); // Генерируем случайный аргумент
+        double argument = dist(gen);
         int argument2 = 0;
         if (task.type == "Power"){
-            argument2 = dist2(gen); // Генерируем случайное значение для второго аргумента в случае Power
+            argument2 = dist2(gen); 
         }
 
         Task current_task = {task.type, argument, task.iter, argument2};
         size_t task_id = server.add_task(current_task);
         double result = server.request_result(task_id);
 
-        file << "Task " << task_id << ": arg1 = " << argument;
+        file << "Task: " << task_id << " arg1: " << argument;
         if (task.type == "Power") {
-            file << " arg2 = " << argument2;
+            file << " arg2: " << argument2;
         }
-        file << " Result = " << result << std::endl;
+        file << " Result: " << result << std::endl;
     }
 
     file.close();
@@ -116,28 +114,33 @@ void client(Server<double>& server, Task task, const std::string& filename) {
 int main(int argc, char *argv[]) {
 
     Task client1, client2, client3;
+    std::string file1, file2, file3;
 
-    if((std::strcmp(argv[1], "Sinus") != 0 && std::strcmp(argv[1], "SquareRoot") != 0 && std::strcmp(argv[1], "Power") != 0)||
-        (std::strcmp(argv[3], "Sinus") != 0 && std::strcmp(argv[3], "SquareRoot") != 0 && std::strcmp(argv[3], "Power") != 0)||
-        (std::strcmp(argv[5], "Sinus") != 0 && std::strcmp(argv[5], "SquareRoot") != 0 && std::strcmp(argv[5], "Power") != 0)||
+    if((std::strcmp(argv[1], "Sinus") != 0 && std::strcmp(argv[1], "Square") != 0 && std::strcmp(argv[1], "Power") != 0)||
+        (std::strcmp(argv[3], "Sinus") != 0 && std::strcmp(argv[3], "Square") != 0 && std::strcmp(argv[3], "Power") != 0)||
+        (std::strcmp(argv[5], "Sinus") != 0 && std::strcmp(argv[5], "Square") != 0 && std::strcmp(argv[5], "Power") != 0)||
         argc != 7 || std::strcmp(argv[1], "help") == 0){
-        std::cerr << "Введите аргументы в формате: функция (Sinus, SquareRoot, Power) и количество операций (от 5 до 10000) для каждого клиента," << '\n'
-         <<"последовательно, например: Sinus 20 SquareRoot 30 Power 25";
+        std::cerr << "Введите аргументы в формате: функция (Sinus, Square, Power), количество операций (от 5 до 10000)"
+        <<'\n'
+        <<"последовательно, например: Sinus 20 Square 30 Power 25";
     }
     else{
         client1.type = argv[1];
         client1.iter = atof(argv[2]);
+        file1 = std::string(argv[1]) + ".txt";
         client2.type = argv[3];
         client2.iter = atof(argv[4]);
+        file2 = std::string(argv[3]) + ".txt";
         client3.type = argv[5];
         client3.iter = atof(argv[6]);
+        file3 = std::string(argv[5]) + ".txt";
     }
     Server<double> server;
     server.start();
 
-    std::thread client_serv1(client, std::ref(server), client1, "Sinus_results.txt");
-    std::thread client_serv2(client, std::ref(server), client2, "sqrt_results.txt");
-    std::thread client_serv3(client, std::ref(server), client3, "power_results.txt");
+    std::thread client_serv1(client, std::ref(server), client1, file1);
+    std::thread client_serv2(client, std::ref(server), client2, file2);
+    std::thread client_serv3(client, std::ref(server), client3, file3);
 
     client_serv1.join();
     client_serv2.join();

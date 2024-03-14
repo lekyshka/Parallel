@@ -1,2 +1,0 @@
-Task 2: arg1 = 2.67006 Result = 1.63403
-Task 9: arg1 = 1.99942 Result = 1.41401

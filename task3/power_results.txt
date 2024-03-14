@@ -1,3 +1,0 @@
-Task 1: arg1 = 1.07855 arg2 = 7 Result = 1.69774
-Task 3: arg1 = 0.588026 arg2 = 9 Result = 0.00840555
-Task 5: arg1 = 1.84125 arg2 = 3 Result = 6.24222
