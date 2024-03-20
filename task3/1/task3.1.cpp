@@ -1,7 +1,7 @@
 #include <iostream>
 #include <vector>
 #include <thread>
-#include <omp.h>
+#include <chrono> 
 
 void initialize(std::vector<long long>& vector, int startIndex, int endIndex, int n, std::vector<long long>& matrix) {
     for (int i = startIndex; i < endIndex; ++i) {
@@ -52,9 +52,8 @@ int main() {
     threads.clear();
     startIndex = 0;
 
-    double t;
-    t = omp_get_wtime ();
-    
+    auto start = std::chrono::high_resolution_clock::now();
+
     for (int i = 0; i < numThreads; ++i) {
         int endIndex = (i == numThreads - 1) ? n : startIndex + chunkSizeVec;
         threads.emplace_back(multiplication, std::ref(vector), std::ref(matrix), std::ref(result), startIndex, endIndex, n);
@@ -65,13 +64,15 @@ int main() {
         thread.join();
     }
     
-    t = omp_get_wtime () - t;
+    auto end = std::chrono::high_resolution_clock::now();
+
+    std::chrono::duration<double> elapsed_seconds = end - start; 
 
     std::cout << std::endl;
     for (int i = 0; i < 5; ++i) {
         std::cout << result[i] << " " << '\n';
     }
-    std::cout << t << '\n';
-    std::cout << 13.0131/t << '\n';
+    std::cout << elapsed_seconds.count() << " seconds" << '\n';
+    std::cout << 13.0131 / elapsed_seconds.count() << '\n';
     return 0;
 }

@@ -8,6 +8,9 @@
 #include <functional>
 #include <string>
 #include <cstring> 
+// #include <boost/program_options.hpp>
+
+// namespace po = boost::program_options;
 
 struct Task {
     std::string type;
@@ -74,6 +77,7 @@ private:
     std::unordered_map<size_t, T> results_;
     size_t task_id_ = 0;
     std::mutex mutex_;
+    std::lock_guard<std::mutex> lock_guard{mutex_};
     bool running;
 };
 
