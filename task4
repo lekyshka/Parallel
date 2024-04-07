@@ -1,157 +1,11 @@
-# import cv2
-# import logging
-# import threading
-# import time
-# import argparse
-#
-# logging.basicConfig(filename='log/app.log', level=logging.ERROR)
-#
-# class Sensor:
-#     def get(self):
-#         raise NotImplementedError("Subclasses must implement method get()")
-#
-# class SensorX(Sensor):
-#     """Sensor X"""
-#     def __init__(self, delay: float):
-#         self.delay = delay
-#         self.data = 0
-#
-#     def get(self) -> int:
-#         time.sleep(self.delay)
-#         self.data += 1
-#         return self.data
-#
-# class SensorManager:
-#     def __init__(self):
-#         self.sensors = [
-#             SensorX(0.01),
-#             SensorX(0.1),
-#             SensorX(1)
-#         ]
-#         self.sensor_values = [0] * len(self.sensors)
-#         self.threads = []
-#         self.running = True
-#
-#     def start(self):
-#         for sensor in self.sensors:
-#             thread = threading.Thread(target=self._run_sensor, args=(sensor,))
-#             self.threads.append(thread)
-#             thread.start()
-#
-#     def _run_sensor(self, sensor):
-#         while self.running:
-#             data = sensor.get()
-#             self.sensor_values[self.sensors.index(sensor)] = data
-#
-#     def get_sensor_values(self):
-#         return self.sensor_values
-#
-#     def stop(self):
-#         self.running = False
-#         for thread in self.threads:
-#             thread.join()
-#
-#
-# class WindowImage:
-#     def __init__(self, display_rate):
-#         self.display_rate = display_rate
-#         self.window_name = 'Webcam'
-#         cv2.namedWindow(self.window_name)
-#
-#     def show(self, frame):
-#         try:
-#             cv2.imshow(self.window_name, frame)
-#             cv2.waitKey(self.display_rate)
-#         except Exception as e:
-#             logging.error(f"Error occurred while displaying frame: {e}")
-#
-#     def __del__(self):
-#         try:
-#             cv2.destroyWindow(self.window_name)
-#         except Exception as e:
-#             logging.error(f"Error occurred while destroying window: {e}")
-#
-#
-# class SensorCam:
-#     def __init__(self, camera_id, resolution):
-#         self.camera_id = camera_id
-#         self.resolution = resolution
-#         self.cap = cv2.VideoCapture(camera_id)
-#
-#         if not self.cap.isOpened():
-#             logging.error(f"Failed to open camera with name: {camera_id}")
-#             raise ValueError(f"Failed to open camera with name: {camera_id}")
-#
-#         width, height = resolution
-#         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
-#         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
-#
-#     def get(self):
-#         ret, frame = self.cap.read()
-#         if not ret:
-#             logging.error(f"Failed to read frame from camera: {self.camera_id}")
-#             raise RuntimeError(f"Failed to read frame from camera: {self.camera_id}")
-#         return frame
-#
-#     def __del__(self):
-#         self.cap.release()
-#
-#
-#
-# def main(camera_id, resolution, display_rate):
-#     try:
-#         sensor_manager = SensorManager()
-#
-#
-#         window = WindowImage(display_rate)
-#         camera = SensorCam(camera_id, resolution)
-#         if not camera.cap.isOpened():
-#             logging.error(f"Failed to open webcam with ID: {camera_id}")
-#             raise ValueError(f"Failed to open webcam with ID: {camera_id}")
-#
-#         sensor_manager.start()
-#
-#         while True:
-#             frame = camera.get()
-#             sensor_values = sensor_manager.get_sensor_values()
-#
-#             text = ", ".join([f"Sensor {i + 1}: {value}" for i, value in enumerate(sensor_values)])
-#             cv2.putText(frame, text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-#
-#             window.show(frame)
-#
-#             if cv2.waitKey(1) & 0xFF == ord('q'):
-#                 break
-#
-#         camera.__del__()
-#
-#
-#     except Exception as e:
-#         logging.exception(f"An error occurred: {e}")
-#         raise SystemExit("Program terminated due to error")
-#     finally:
-#         window.__del__()
-#         sensor_manager.stop()
-#
-# if __name__ == "__main__":
-#     parser = argparse.ArgumentParser(description='Process some integers.')
-#     parser.add_argument('--camera_id', type=int, default=0, help='ID of the camera (default: 0)')
-#     parser.add_argument('--resolution', type=str, default='640x480', help='Desired resolution of the camera (default: 640x480)')
-#     parser.add_argument('--display_rate', type=int, default=100, help='Rate at which to display images (default: 100 ms)')
-#     args = parser.parse_args()
-#     resolution = tuple(map(int, args.resolution.split('x')))
-#     main(args.camera_id, resolution, args.display_rate)
-
-
-
 import cv2
 import logging
 import threading
 import time
 import argparse
-import queue
+from queue import Queue
 
-logging.basicConfig(filename='log/app.log', level=logging.ERROR)
+logging.basicConfig(filename='app.log', level=logging.ERROR, filemode="w")
 
 class Sensor:
     def get(self):
@@ -169,30 +23,44 @@ class SensorX(Sensor):
         return self.data
 
 class SensorManager:
-    def __init__(self, queue):
+    def __init__(self):
         self.sensors = [
             SensorX(0.01),
             SensorX(0.1),
             SensorX(1)
         ]
-        self.queue = queue
+        self.q = [
+            Queue(),
+            Queue(),
+            Queue()
+            ]
+        self.sensor_values = [0] * len(self.sensors)
+        self.threads = []
         self.running = True
 
     def start(self):
-        threads = []
-        for sensor in self.sensors:
-            thread = threading.Thread(target=self._run_sensor, args=(sensor,))
-            threads.append(thread)
+        for sensor, qu in zip(self.sensors, self.q):
+            thread = threading.Thread(target=self._run_sensor, args=(sensor, qu,))
+            self.threads.append(thread)
             thread.start()
-        return threads
 
-    def _run_sensor(self, sensor):
+
+    def _run_sensor(self, sensor, qu):
         while self.running:
-            data = sensor.get()
-            self.queue.put((sensor, data))
+            qu.put(sensor.get())
+
+
+    def get_sensor_values(self):
+        for sensor, queue in zip(self.sensors, self.q):
+            while not queue.empty():
+                self.sensor_values[self.sensors.index(sensor)] = queue.get()
+
+        return self.sensor_values
 
     def stop(self):
         self.running = False
+        for thread in self.threads:
+            thread.join()
 
 class WindowImage:
     def __init__(self, display_rate):
@@ -214,10 +82,11 @@ class WindowImage:
             logging.error(f"Error occurred while destroying window: {e}")
 
 class SensorCam:
-    def __init__(self, camera_id, resolution):
+    def __init__(self, camera_id, resolution, sensor_manager):
         self.camera_id = camera_id
         self.resolution = resolution
         self.cap = cv2.VideoCapture(camera_id)
+        self.sensor_manager = sensor_manager
 
         if not self.cap.isOpened():
             logging.error(f"Failed to open camera with name: {camera_id}")
@@ -227,73 +96,51 @@ class SensorCam:
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
 
-    def get(self):
-        ret, frame = self.cap.read()
-        if not ret:
-            logging.error(f"Failed to read frame from camera: {self.camera_id}")
-            raise RuntimeError(f"Failed to read frame from camera: {self.camera_id}")
-        return frame
-
-    def __del__(self):
-        self.cap.release()
-
-class SensorProcessor:
-    def __init__(self, sensors, queue):
-        self.sensors = sensors
-        self.queue = queue
-        self.sensor_values = [0] * len(sensors)
-
-    def process_data(self):
+    def start(self):
         while True:
-            sensor, data = self.queue.get()
-            sensor_index = self.sensors.index(sensor)
-            self.sensor_values[sensor_index] = data
+            ret, frame = self.cap.read()
+            if not ret:
+                logging.error(f"Failed to read frame from camera: {self.camera_id}")
+                raise RuntimeError(f"Failed to read frame from camera: {self.camera_id}")
 
-class MainProcessor:
-    def __init__(self, sensor_manager, sensor_processor):
-        self.sensor_manager = sensor_manager
-        self.sensor_processor = sensor_processor
-        self.window = WindowImage(100)
-        self.camera = SensorCam(0, (640, 480))
-
-    def process_sensor_data(self):
-        threads = self.sensor_manager.start()
-        processor_thread = threading.Thread(target=self.sensor_processor.process_data)
-        processor_thread.start()
-
-        while True:
-            frame = self.camera.get()
-            sensor_values = self.sensor_processor.sensor_values
-
+            sensor_values = self.sensor_manager.get_sensor_values()
             text = ", ".join([f"Sensor {i + 1}: {value}" for i, value in enumerate(sensor_values)])
             cv2.putText(frame, text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
-            self.window.show(frame)
+            self.show(frame)
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
 
-        self.camera.__del__()
+    def show(self, frame):
+        try:
+            cv2.imshow('Webcam', frame)
+            cv2.waitKey(1)
+        except Exception as e:
+            logging.error(f"Error occurred while displaying frame: {e}")
 
-        self.sensor_manager.stop()
-        for thread in threads:
-            thread.join()
-        processor_thread.join()
-
+    def __del__(self):
+        self.cap.release()
 
 def main(camera_id, resolution, display_rate):
     try:
-        queue_sensor = queue.Queue()
-        sensor_manager = SensorManager(queue_sensor)
-        sensor_processor = SensorProcessor(sensor_manager.sensors, queue_sensor)
-        main_processor = MainProcessor(sensor_manager, sensor_processor)
+        sensor_manager = SensorManager()
 
-        main_processor.process_sensor_data()
+        window = WindowImage(display_rate)
+        camera = SensorCam(camera_id, resolution, sensor_manager)
+        if not camera.cap.isOpened():
+            logging.error(f"Failed to open webcam with ID: {camera_id}")
+            raise ValueError(f"Failed to open webcam with ID: {camera_id}")
+
+        sensor_manager.start()
+        camera.start()
 
     except Exception as e:
         logging.exception(f"An error occurred: {e}")
-        raise SystemExit("Program terminated due to error: ", str(e))
-
+        raise SystemExit("Program terminated due to error")
+    finally:
+        window.__del__()
+        sensor_manager.stop()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Process some integers.')
