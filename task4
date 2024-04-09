@@ -138,6 +138,7 @@ class SensorCam:
 
 def main(camera_id, resolution, display_rate):
     try:
+        display_rate = 1 / display_rate
         sensor_manager = SensorManager()
         camera = SensorCam(camera_id, resolution)
         window = WindowImage(display_rate, sensor_manager, camera)
@@ -163,7 +164,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Process some integers.')
     parser.add_argument('--camera_id', type=int, default=0, help='ID of the camera (default: 0)')
     parser.add_argument('--resolution', type=str, default='640x480', help='Desired resolution of the camera (default: 640x480)')
-    parser.add_argument('--display_rate', type=int, default=1, help='Rate at which to display images (default: 1 ms)')
+    parser.add_argument('--display_rate', type=int, default=1, help='Rate at which to display images (default: 1 hz)')
     args = parser.parse_args()
     resolution = tuple(map(int, args.resolution.split('x')))
     main(args.camera_id, resolution, args.display_rate)
