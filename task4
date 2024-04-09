@@ -63,17 +63,30 @@ class SensorManager:
             thread.join()
 
 class WindowImage:
-    def __init__(self, display_rate):
+    def __init__(self, display_rate, sensor_manager, camera):
         self.display_rate = display_rate
         self.window_name = 'Webcam'
-        cv2.namedWindow(self.window_name)
+        self.camera = camera
+        self.sensor_manager = sensor_manager
 
-    def show(self, frame):
-        try:
-            cv2.imshow(self.window_name, frame)
-            cv2.waitKey(self.display_rate)
-        except Exception as e:
-            logging.error(f"Error occurred while displaying frame: {e}")
+    def show(self):
+        self.sensor_manager.start()
+        self.camera.start()
+        # frame = self.camera.get_frame()
+        while True:
+            sensor_values = self.sensor_manager.get_sensor_values()
+            frame = self.camera.get_frame()
+
+            if frame is not None:
+                text = ", ".join([f"Sensor {i + 1}: {value}" for i, value in enumerate(sensor_values)])
+                cv2.putText(frame, text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    break
+                try:
+                    cv2.imshow(self.window_name, frame)
+                    cv2.waitKey(self.display_rate)
+                except Exception as e:
+                    logging.error(f"Error occurred while displaying frame: {e}")
 
     def __del__(self):
         try:
@@ -82,12 +95,11 @@ class WindowImage:
             logging.error(f"Error occurred while destroying window: {e}")
 
 class SensorCam:
-    def __init__(self, camera_id, resolution, sensor_manager):
+    def __init__(self, camera_id, resolution):
         self.camera_id = camera_id
         self.resolution = resolution
         self.cap = cv2.VideoCapture(camera_id)
-        self.sensor_manager = sensor_manager
-
+        self.q = Queue()
         if not self.cap.isOpened():
             logging.error(f"Failed to open camera with name: {camera_id}")
             raise ValueError(f"Failed to open camera with name: {camera_id}")
@@ -95,45 +107,49 @@ class SensorCam:
         width, height = resolution
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+        self.running = True
+        self.threads = []
 
     def start(self):
-        while True:
+        thread = threading.Thread(target=self._run_cam, args=(self.q,))
+        self.threads.append(thread)
+        thread.start()
+
+    def _run_cam(self, q):
+        while self.running:
             ret, frame = self.cap.read()
             if not ret:
                 logging.error(f"Failed to read frame from camera: {self.camera_id}")
                 raise RuntimeError(f"Failed to read frame from camera: {self.camera_id}")
+            else:
+                q.put(frame)
 
-            sensor_values = self.sensor_manager.get_sensor_values()
-            text = ", ".join([f"Sensor {i + 1}: {value}" for i, value in enumerate(sensor_values)])
-            cv2.putText(frame, text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+    def get_frame(self):
+        if not self.q.empty():
+            return self.q.get()
 
-            self.show(frame)
-
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
-
-    def show(self, frame):
-        try:
-            cv2.imshow('Webcam', frame)
-            cv2.waitKey(1)
-        except Exception as e:
-            logging.error(f"Error occurred while displaying frame: {e}")
 
     def __del__(self):
+        self.running = False
+        for thread in self.threads:
+            thread.join()
         self.cap.release()
+
 
 def main(camera_id, resolution, display_rate):
     try:
         sensor_manager = SensorManager()
+        camera = SensorCam(camera_id, resolution)
+        window = WindowImage(display_rate, sensor_manager, camera)
 
-        window = WindowImage(display_rate)
-        camera = SensorCam(camera_id, resolution, sensor_manager)
         if not camera.cap.isOpened():
             logging.error(f"Failed to open webcam with ID: {camera_id}")
             raise ValueError(f"Failed to open webcam with ID: {camera_id}")
 
-        sensor_manager.start()
-        camera.start()
+
+        window.show()
+
+
 
     except Exception as e:
         logging.exception(f"An error occurred: {e}")
@@ -141,12 +157,13 @@ def main(camera_id, resolution, display_rate):
     finally:
         window.__del__()
         sensor_manager.stop()
+        camera.__del__()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Process some integers.')
     parser.add_argument('--camera_id', type=int, default=0, help='ID of the camera (default: 0)')
     parser.add_argument('--resolution', type=str, default='640x480', help='Desired resolution of the camera (default: 640x480)')
-    parser.add_argument('--display_rate', type=int, default=100, help='Rate at which to display images (default: 100 ms)')
+    parser.add_argument('--display_rate', type=int, default=1, help='Rate at which to display images (default: 1 ms)')
     args = parser.parse_args()
     resolution = tuple(map(int, args.resolution.split('x')))
     main(args.camera_id, resolution, args.display_rate)
