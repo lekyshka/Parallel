@@ -171,9 +171,9 @@ def main(camera_id, resolution, display_rate):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Process some integers.')
-    parser.add_argument('--camera_id', type=int, default=3, help='ID of the camera (default: 0)')
+    parser.add_argument('--camera_id', type=int, default=0, help='ID of the camera (default: 0)')
     parser.add_argument('--resolution', type=str, default='640x480', help='Desired resolution of the camera (default: 640x480)')
-    parser.add_argument('--display_rate', type=int, default=100, help='Rate at which to display images (default: 1 hz)')
+    parser.add_argument('--display_rate', type=int, default=100, help='Rate at which to display images (default: 100 hz)')
     args = parser.parse_args()
     resolution = tuple(map(int, args.resolution.split('x')))
     main(args.camera_id, resolution, args.display_rate)
