@@ -16,12 +16,12 @@ namespace po = boost::program_options;
 
 void initialize(double *A, double *Anew, int n)
 {
-    // memset(A, 0, n * n * sizeof(double));
-    // memset(Anew, 0, n *n * sizeof(double));
-    for(int i = 0; i < n * n; i++){
-        A[i] = 0.0;
-        Anew[i] = 0.0;
-    }
+    memset(A, 0, n * n * sizeof(double));
+    memset(Anew, 0, n *n * sizeof(double));
+    // for(int i = 0; i < n * n; i++){
+    //     A[i] = 0.0;
+    //     Anew[i] = 0.0;
+    // }
     double corners[4] = {10, 20, 30, 20};
     A[0] = corners[0];
     A[n - 1] = corners[1];
