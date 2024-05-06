@@ -52,13 +52,12 @@ int main(int argc, char* argv[]) {
         ("iterations", po::value<int>()->default_value(1000000), "Set number of iterations");
 
     po::variables_map vm;
-    po::store(po::parse_command_line(argc, argv, desc), vm);
-    po::notify(vm);
-
     if (vm.count("help")) {
         std::cout << desc << std::endl;
         return 1;
     }
+    po::store(po::parse_command_line(argc, argv, desc), vm);
+    po::notify(vm);
 
     double precision = vm["precision"].as<double>();
     int n = vm["grid-size"].as<int>();
@@ -72,8 +71,6 @@ int main(int argc, char* argv[]) {
 
     double* A = A_ptr.get();
     double* Anew = Anew_ptr.get();
-
-    
 
     printf("Jacobi relaxation Calculation: %d x %d mesh\n", n, n);
 
