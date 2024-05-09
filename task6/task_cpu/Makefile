@@ -1,27 +1,17 @@
-CXX = g++-13
-CC = pgcc
-CXXFLAGS = -O2 -Wall -std=c++20
-CFLAGS = -fast -acc -ta=multicore
-LD = pgcc
-LDFLAGS = -fast -acc -ta=multicore -lstdc++ -lboost_program_options
-NVTXLIB = -I/opt/nvidia/hpc_sdk/Linux_x86_64/23.11/cuda/12.3/include/
+INFO = -Minfo=all
+LIBS = -lboost_program_options
+HOST = -acc=host
+MULT = -acc=multicore
+CXX = pgc++
 
-SOURCES = main.cpp
-OBJECTS = $(SOURCES:.cpp=.o)
-TARGETS = main
+all:one multi
+	
 
-%.o: %.cpp
-	$(CXX) $(CXXFLAGS) $(NVTXLIB) -c -o $@ $<
+one:
+	$(CXX) $(HOST) $(INFO) $(LIBS) -o $@ main.cpp
 
-%.o: %.c
-	$(CC) $(CFLAGS) $(NVTXLIB) -c -o $@ $<
+multi:
+	$(CXX) $(MULT) $(INFO) $(LIBS) -o $@ main.cpp
 
-all: $(TARGETS)
-
-main: $(OBJECTS)
-	$(LD) -o $@ $^ $(LDFLAGS)
-
-clean:
-	rm -f $(TARGETS) $(OBJECTS) *.mod core
-
-.PHONY: all clean
+clean:all
+	rm serial one
