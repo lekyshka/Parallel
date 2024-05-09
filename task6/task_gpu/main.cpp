@@ -99,7 +99,7 @@ int main(int argc, char* argv[]) {
                 printf("%5d, %0.6f\n", iter, error);
             }
             else{
-                #pragma acc parallel loop independent collapse(2) vector vector_length(256) gang num_gangs(1024) present(A,Anew)
+                #pragma acc parallel loop independent collapse(2) vector vector_length(n) gang num_gangs(n) present(A,Anew)
                 for( int j = 1; j < n-1; j++) {
                     for( int i = 1; i < n-1; i++ ) {
                         Anew[OFFSET(j, i, n)] = ( A[OFFSET(j, i+1, n)] + A[OFFSET(j, i-1, n)]
