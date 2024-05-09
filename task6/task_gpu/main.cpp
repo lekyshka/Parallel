@@ -52,11 +52,11 @@ int main(int argc, char* argv[]) {
         ("iterations", po::value<int>()->default_value(1000000), "Set number of iterations");
 
     po::variables_map vm;
+    po::store(po::parse_command_line(argc, argv, desc), vm);
     if (vm.count("help")) {
         std::cout << desc << std::endl;
         return 1;
     }
-    po::store(po::parse_command_line(argc, argv, desc), vm);
     po::notify(vm);
 
     double precision = vm["precision"].as<double>();
