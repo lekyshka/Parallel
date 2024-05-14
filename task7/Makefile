@@ -8,4 +8,4 @@ main:
 	$(CXX) $(GPU) $(LIBS) $(INFO) -o $@ main.cpp 
 
 clean:all
-	rm main
+	rm -f main
