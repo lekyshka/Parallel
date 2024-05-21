@@ -104,7 +104,7 @@ int main(int argc, char const *argv[])
     desc.add_options()
         ("help", "Produce help message")
         ("precision", po::value<double>()->default_value(0.000001), "Set precision")
-        ("grid-size", po::value<int>()->default_value(256), "Set grid size")
+        ("grid-size", po::value<int>()->default_value(512), "Set grid size")
         ("iterations", po::value<int>()->default_value(1000000), "Set number of iterations");
 
     po::variables_map vm;
@@ -184,7 +184,7 @@ int main(int argc, char const *argv[])
 	while (error > precision && iter < iter_max){
 		if(flag_graph == 1){
 			cudaGraphLaunch(graph_save,stream);
-
+			cub::DeviceReduce::Max(tmp,tmp_size,error_device,error_GPU,n*n,stream);
 			cudaMemcpyAsync(&error,error_GPU,sizeof(double),cudaMemcpyDeviceToHost, stream);
 			cudaStreamSynchronize(stream);
 
@@ -205,8 +205,6 @@ int main(int argc, char const *argv[])
 
 			Calculate_matrix<<<grid, block, 0, stream>>>(Anew_device,A_device,n);
 			Error_matrix<<<grid, block, 0, stream>>>(Anew_device,A_device,error_device,n);
-			
-			cub::DeviceReduce::Max(tmp,tmp_size,error_device,error_GPU,n*n,stream);
 
 			cudaStreamEndCapture(stream, &graph);
 			cudaGraphInstantiate(&graph_save, graph, NULL, NULL, 0);
