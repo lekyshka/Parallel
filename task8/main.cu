@@ -11,9 +11,6 @@ namespace po = boost::program_options;
 #include <cuda_runtime.h>
 #include <cub/cub.cuh>
 
-#define OFFSET(x, y, m) (((x)*(m)) + (y))
-
-
 // cuda unique_ptr
 template<typename T>
 using cuda_unique_ptr = std::unique_ptr<T,std::function<void(T*)>>;
@@ -105,8 +102,8 @@ void deallocate(double *A, double *Anew, double* error_matrix)
 {
 
     A = nullptr;
-    Anew = nullptr;
-	error_matrix = nullptr;
+    Anew = nullptr;	
+    error_matrix = nullptr;
 
 }
 
