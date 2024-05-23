@@ -2,6 +2,13 @@ cmake_minimum_required(VERSION 3.22)
 
 project(Example_class VERSION 1.0 LANGUAGES CXX CUDA)
 
+option(TEST "TEST" OFF)
+
+if(TEST)
+    message(STATUS "TEST")
+    add_definitions(-DTEST)
+endif()
+
 set(CMAKE_CXX_COMPILER "nvc++")
 
 set(EXECUTABLE_NAME "main")
