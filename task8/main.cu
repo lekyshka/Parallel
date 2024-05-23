@@ -39,6 +39,45 @@ void cuda_delete(T *dev_ptr)
 }
 
 
+cudaStream_t* cuda_new_stream()
+{
+    cudaStream_t* stream = new cudaStream_t;
+    cudaStreamCreate(stream);
+    return stream;
+}
+
+void cuda_delete_stream(cudaStream_t* stream)
+{
+    cudaStreamDestroy(*stream);
+    delete stream;
+}
+
+cudaGraph_t* cuda_new_graph()
+{
+    cudaGraph_t* graph = new cudaGraph_t;
+    return graph;
+}
+
+void cuda_delete_graph(cudaGraph_t* graph)
+{
+    cudaGraphDestroy(*graph);
+    delete graph;
+}
+
+cudaGraphExec_t* cuda_new_graph_save()
+{
+    cudaGraphExec_t* graphExec = new cudaGraphExec_t;
+    return graphExec;
+}
+
+void cuda_delete_graph_save(cudaGraphExec_t* graphExec)
+{
+    cudaGraphExecDestroy(*graphExec);
+    delete graphExec;
+}
+
+
+
 void initialize(std::unique_ptr<double[]> &A, std::unique_ptr<double[]> &Anew, int n)
 {
     memset(A.get(), 0, n * n * sizeof(double));
@@ -94,6 +133,8 @@ void Error_matrix(double *Anew, double *A,double *error,int size)
     unsigned int j = blockIdx.x * blockDim.x + threadIdx.x;
     unsigned int i = blockIdx.y * blockDim.y + threadIdx.y;
 
+    if (i * size + j > size * size) return;
+
     error[i * size + j] = fabs(A[i * size + j] - Anew[i * size + j]);
 }
 
@@ -104,7 +145,7 @@ int main(int argc, char const *argv[])
     desc.add_options()
         ("help", "Produce help message")
         ("precision", po::value<double>()->default_value(0.000001), "Set precision")
-        ("grid-size", po::value<int>()->default_value(512), "Set grid size")
+        ("grid-size", po::value<int>()->default_value(33), "Set grid size")
         ("iterations", po::value<int>()->default_value(1000000), "Set number of iterations");
 
     po::variables_map vm;
@@ -133,13 +174,12 @@ int main(int argc, char const *argv[])
     double* error_matrix = E_ptr.get();
     
 
-    cudaStream_t stream;
-    cudaStreamCreate(&stream);
+    cuda_unique_ptr<cudaStream_t> stream_ptr(cuda_new_stream(),cuda_delete_stream);
+    cuda_unique_ptr<cudaGraph_t>graph(cuda_new_graph(),cuda_delete_graph);
+    cuda_unique_ptr<cudaGraphExec_t>graph_save(cuda_new_graph_save(),cuda_delete_graph_save);
 
-    cudaGraph_t graph;
-    cudaGraphExec_t graph_save;
-
-
+    auto stream = *stream_ptr;
+  
 	cuda_unique_ptr<double> A_device_ptr(cuda_new<double>(sizeof(double)*n*n), cuda_delete<double>);
 	cuda_unique_ptr<double> Anew_device_ptr(cuda_new<double>(sizeof(double)*n*n), cuda_delete<double>);
 	cuda_unique_ptr<double> error_device_ptr(cuda_new<double>(sizeof(double)*n*n), cuda_delete<double>);
@@ -159,21 +199,28 @@ int main(int argc, char const *argv[])
 		exit(3);
 	}
 
-	cuda_unique_ptr<double> tmp_ptr(cuda_new<double>(0), cuda_delete<double>);
-	double *tmp = tmp_ptr.get();
-    size_t tmp_size = 0;
+	cuda_unique_ptr<double> tmp_ptr_old(cuda_new<double>(0), cuda_delete<double>);
+	double *tmp_old = tmp_ptr_old.get();
+    size_t tmp_size_old = 0;
     
-    cub::DeviceReduce::Max(tmp,tmp_size,Anew_device,error_GPU,n*n);
+    cub::DeviceReduce::Max(tmp_old,tmp_size_old,Anew_device,error_GPU,n*n);
+	
+	size_t tmp_size = tmp_size_old;
+	cuda_unique_ptr<double> tmp_ptr(cuda_new<double>(tmp_size), cuda_delete<double>);
+	double *tmp = tmp_ptr.get();
 
 
-	cudaErr1 = cudaMalloc(&tmp,tmp_size);
-	if (cudaErr1 != cudaSuccess){
-		std::cerr << "Memory transfering error" << std::endl;
-		exit(3);
-	}
+    int size_bl = 0;
+    if(n % 32 == 0){
+        size_bl = 32;
+    }
+    else{
+        size_bl = n % 32;
+    }
 
-    dim3 block = dim3(32, 32);
-    dim3 grid(n / block.x, n / block.y);
+    dim3 block = dim3(size_bl, size_bl);
+    dim3 grid((n + block.x - 1) /  block.x, (n + block.y - 1) /  block.y);
+
 
 	int flag_graph = 0;
    
@@ -183,10 +230,9 @@ int main(int argc, char const *argv[])
 
 	while (error > precision && iter < iter_max){
 		if(flag_graph == 1){
-			cudaGraphLaunch(graph_save,stream);
+			cudaGraphLaunch(*graph_save, stream);
 			cub::DeviceReduce::Max(tmp,tmp_size,error_device,error_GPU,n*n,stream);
-			cudaMemcpyAsync(&error,error_GPU,sizeof(double),cudaMemcpyDeviceToHost, stream);
-			cudaStreamSynchronize(stream);
+			cudaMemcpy(&error,error_GPU,sizeof(double),cudaMemcpyDeviceToHost);
 
 			iter += 100;
 			printf("%5d, %0.6f\n", iter, error);
@@ -206,8 +252,8 @@ int main(int argc, char const *argv[])
 			Calculate_matrix<<<grid, block, 0, stream>>>(Anew_device,A_device,n);
 			Error_matrix<<<grid, block, 0, stream>>>(Anew_device,A_device,error_device,n);
 
-			cudaStreamEndCapture(stream, &graph);
-			cudaGraphInstantiate(&graph_save, graph, NULL, NULL, 0);
+			cudaStreamEndCapture(stream, graph.get());
+			cudaGraphInstantiate(graph_save.get(), *graph, NULL, NULL, 0);
 
 			flag_graph = 1;
 		}
@@ -220,27 +266,21 @@ int main(int argc, char const *argv[])
     printf("%5d, %0.6f\n", iter, error);
 	printf(" total: %f s\n", runtime);
 
+#ifdef TEST
+    cudaErr1 = cudaMemcpy(A,A_device,sizeof(double)*n*n,cudaMemcpyDeviceToHost);
 
-    // cudaErr1 = cudaMemcpy(A,A_device,sizeof(double)*n*n,cudaMemcpyDeviceToHost);
-
-	// if (cudaErr1 != cudaSuccess){
-	// 	std::cerr << "Memory transfering error" << std::endl;
-	// 	exit(3);
-	// }
+	if (cudaErr1 != cudaSuccess){
+		std::cerr << "Memory transfering error" << std::endl;
+		exit(3);
+	}
 	
-	// for (size_t i = 0; i < N; i++){
-	// 	for (size_t j = 0; j < N; j++){
-
-	// 		std::cout << A[i*N+j] << ' ';
-			
-	// 	}
-    //     std::cout << std::endl;
-    // }
-
-
-    cudaStreamDestroy(stream);
-    cudaGraphDestroy(graph);
-	deallocate(A, Anew, error_matrix);
+    for(int i = 0; i < n; i++){
+        for(int j = 0; j < n; j++){
+            printf("%0.6f ", A[i*n+j]); 
+        }
+        printf("\n");
+    }
+#endif
 
 
     return 0;
