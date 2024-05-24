@@ -11,8 +11,6 @@ namespace po = boost::program_options;
 #include <cuda_runtime.h>
 #include <cub/cub.cuh>
 
-#define OFFSET(x, y, m) (((x)*(m)) + (y))
-
 
 // cuda unique_ptr
 template<typename T>
