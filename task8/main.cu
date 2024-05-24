@@ -101,14 +101,6 @@ void initialize(std::unique_ptr<double[]> &A, std::unique_ptr<double[]> &Anew, i
     
 }
 
-void deallocate(double *A, double *Anew, double* error_matrix)
-{
-
-    A = nullptr;
-    Anew = nullptr;
-	error_matrix = nullptr;
-
-}
 
 
 __global__
