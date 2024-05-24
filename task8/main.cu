@@ -11,6 +11,9 @@ namespace po = boost::program_options;
 #include <cuda_runtime.h>
 #include <cub/cub.cuh>
 
+#define OFFSET(x, y, m) (((x)*(m)) + (y))
+
+
 // cuda unique_ptr
 template<typename T>
 using cuda_unique_ptr = std::unique_ptr<T,std::function<void(T*)>>;
@@ -98,6 +101,15 @@ void initialize(std::unique_ptr<double[]> &A, std::unique_ptr<double[]> &Anew, i
     
 }
 
+void deallocate(double *A, double *Anew, double* error_matrix)
+{
+
+    A = nullptr;
+    Anew = nullptr;
+	error_matrix = nullptr;
+
+}
+
 
 __global__
 void Calculate_matrix(double* A, double* Anew, size_t size)
@@ -107,7 +119,7 @@ void Calculate_matrix(double* A, double* Anew, size_t size)
 
 	if (i * size + j > size * size) return;
 	
-	if(!((j == 0 || i == 0 || j == size - 1 || i == size - 1)))
+	if(!((j == 0 || i == 0 || j >= size - 1 || i >= size - 1)))
 	{
 		Anew[i * size + j] = 0.25 * (A[i * size + j - 1] + A[(i - 1) * size + j] +
 							A[(i + 1) * size + j] + A[i * size + j + 1]);		
@@ -133,7 +145,7 @@ int main(int argc, char const *argv[])
     desc.add_options()
         ("help", "Produce help message")
         ("precision", po::value<double>()->default_value(0.000001), "Set precision")
-        ("grid-size", po::value<int>()->default_value(33), "Set grid size")
+        ("grid-size", po::value<int>()->default_value(10), "Set grid size")
         ("iterations", po::value<int>()->default_value(1000000), "Set number of iterations");
 
     po::variables_map vm;
@@ -197,16 +209,7 @@ int main(int argc, char const *argv[])
 	cuda_unique_ptr<double> tmp_ptr(cuda_new<double>(tmp_size), cuda_delete<double>);
 	double *tmp = tmp_ptr.get();
 
-
-    int size_bl = 0;
-    if(n % 32 == 0){
-        size_bl = 32;
-    }
-    else{
-        size_bl = n % 32;
-    }
-
-    dim3 block = dim3(size_bl, size_bl);
+    dim3 block = dim3(32, 32);
     dim3 grid((n + block.x - 1) /  block.x, (n + block.y - 1) /  block.y);
 
 
@@ -273,3 +276,4 @@ int main(int argc, char const *argv[])
 
     return 0;
 }
+
